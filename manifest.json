@@ -1,17 +1,20 @@
 {
-  "name": "Content Script - Get selection",
+  "name": "Lexa Content Curator",
   "version": "1.0.0",
   "manifest_version": 2,
-  "description": "Gets the selected text from the current page.",
+  "description": "A tool to allow Lexa experts to create courses",
   "browser_action": {
     "default_title": "",
     "default_icon": "icon.png",
-    "popup" : "popup.html"    
+    "popup" : "popup.html"
   },
   "permissions": [
     "tabs",
     "http://*/*",
     "https://*/*"
   ],
+  "background": {
+    "page": "popup.html"
+  },
   "content_security_policy": "script-src 'self' https://*.firebaseio.com; object-src 'self'"
 }

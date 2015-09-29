@@ -2,7 +2,42 @@ Firebase.enableLogging(true);
 Firebase.INTERNAL.forceWebSockets();
 var ref = new Firebase("https://lexa.firebaseio.com/");
 var authData = ref.getAuth();
-var uid = authData.uid;
+var uid;
+var coursesArr;
+//if already logged in
+if (authData) {
+  uid = authData.uid;
+};
+if (!authData) {
+  $("#main").hide();
+  $("#login").show();
+  $("#loginBtn").click(function() {
+    var email = $("#email").val();
+    var password = $("#password").val();
+    ref.authWithPassword({
+      email    : email,
+      password : password
+    }, function(error, authData) {
+      if (error) {
+        console.log("Login Failed!", error);
+      } else {
+        uid = authData.uid;
+        ref.child('courses').orderByChild('uid').equalTo(uid).once('value', function(snapshot) {
+          coursesObj = snapshot.val();
+          coursesArr = Object.keys(coursesObj);
+          var coursesHTML = "";
+          for (var i=0; i<coursesArr.length; i++) {
+            coursesHTML += "<option val='"+coursesArr[i]+"'>"+coursesObj[coursesArr[i]].title+"</option>";
+          }
+          console.log(coursesHTML);
+          $("#courses").html(coursesHTML);
+        });
+        $("#login").hide();
+        $("#main").show();
+      }
+    });
+  });
+};
 var url;
 var pageTitle;
 var selectedData;
@@ -24,10 +59,7 @@ ref.child('courses').orderByChild('uid').equalTo(uid).once('value', function(sna
 chrome.tabs.query({'active': true, 'lastFocusedWindow': true, 'currentWindow': true}, function (tabs) {
   url = tabs[0].url;
   pageTitle = tabs[0].title;
-  if (!authData) {
-    $("#main").hide();
-    $("#login").show();
-  } else if (url.indexOf('youtube.com/watch') != -1) {
+  if (url.indexOf('youtube.com/watch') != -1) {
     $("#login").hide();
     var attrLocation = url.indexOf("=");
     var videoKey = url.slice(attrLocation + 1);
@@ -57,7 +89,7 @@ chrome.tabs.query({'active': true, 'lastFocusedWindow': true, 'currentWindow': t
     $("#login").hide();
     console.log(url);
     var attrLocation = url.indexOf("/e/");
-    var audioKey = url.slice(attrLocation+3, attrLocation+11);
+    var audioKey = url.slice(-8);
     var audioUrl = "http://app.stitcher.com/splayer/f/4903/" + audioKey;
     $("#audioPlayer").attr("src", audioUrl);
     $("#audio").click();
@@ -67,34 +99,6 @@ chrome.tabs.query({'active': true, 'lastFocusedWindow': true, 'currentWindow': t
     $("#login").hide();
     $("#text").click();
   }
-});
-
-$("#loginBtn").click(function() {
-  var email = $("#email").val();
-  var password = $("#password").val();
-  ref.authWithPassword({
-    email    : email,
-    password : password
-  }, function(error, authData) {
-    if (error) {
-      console.log("Login Failed!", error);
-    } else {
-      console.log("Authenticated successfully with payload:", authData);
-      uid = authData.uid;
-      ref.child('courses').orderByChild('uid').equalTo(uid).once('value', function(snapshot) {
-        coursesObj = snapshot.val();
-        coursesArr = Object.keys(coursesObj);
-        var coursesHTML = "";
-        for (var i=0; i<coursesArr.length; i++) {
-          coursesHTML += "<option val='"+coursesArr[i]+"'>"+coursesObj[coursesArr[i]].title+"</option>";
-        }
-        console.log(coursesHTML);
-        $("#courses").html(coursesHTML);
-      });
-      $("#login").hide();
-      $("#main").show();
-    }
-  });
 });
 
 $("#text").click(function() {
@@ -175,13 +179,18 @@ $("#addAudio").click(function() {
 $("#addContent").click(function() {
   console.log('click');
   var selectedCourse = $("#courses").val();
-  console.log(selectedData);
-  ref.child('courses').child(selectedCourse).child('content').push({
-    'data': selectedData,
-    'url': url,
-    'title': pageTitle,
-    'type': type,
-    'done': false
+  ref.child('courses').child(selectedCourse).child('content').once('value', function(snapshot) {
+    var lessonsObj = snapshot.val();
+    var lessonsArr = Object.keys(lessonsObj);
+
+    ref.child('courses').child(selectedCourse).child('content').push({
+      'data': selectedData,
+      'url': url,
+      'title': pageTitle,
+      'type': type,
+      'done': false,
+      'order': lessonsArr.length+1
+    });
   });
   $("#selectCourse").hide();
   $("#main").show();
@@ -200,14 +209,15 @@ $("#newCourseAddContent").click(function() {
     'url': url,
     'title': pageTitle,
     'type': type,
-    'done': false
+    'done': false,
+    'order': 1
   });
   $("#selectCourse").hide();
   $("#main").show();
 });
 
 chrome.extension.onRequest.addListener(onSelection);
-chrome.tabs.executeScript(null, { file: "selection.js" }); 
+chrome.tabs.executeScript(null, { file: "selection.js" });
 
 function onSelection(payload) {
   console.log('Got selection: ' + payload);
